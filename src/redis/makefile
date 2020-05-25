@@ -1,8 +1,7 @@
-target=sds.o sds_small.o zmalloc.o
+target=dict.o dict_main.o zmalloc.o
 sds:${target}
-	gcc -o sds.out ${target}
-sds.o: sds.h sdsalloc.h
-sds_small.o: sds.h testhelp.h
-zmalloc.o: zmalloc.h atomicvar.h
+	gcc -o dict.out ${target}
+dict.o:dict.h fmacros.h zmalloc.h
+dict_main.o: dict.h
 clean:
-	rm sds.out *.o
+	rm dict.out *.o

@@ -1,0 +1,7 @@
+target=dict.o dict_main.o
+sds:${target}
+	gcc -o dict.out ${target}
+dict.o:dict.h fmacros.h zmalloc.h redisassert.h
+dict_main.o dict.h
+clean:
+	rm dict.out *.o

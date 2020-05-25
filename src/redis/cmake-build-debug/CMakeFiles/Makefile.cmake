@@ -39,7 +39,7 @@ set(CMAKE_MAKEFILE_DEPENDS
   "CMakeFiles/3.15.3/CMakeSystem.cmake"
   )
 
-# The corresponding makefile is:
+# The corresponding makefile_sds is:
 set(CMAKE_MAKEFILE_OUTPUTS
   "Makefile"
   "CMakeFiles/cmake.check_cache"

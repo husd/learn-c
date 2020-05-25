@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <stdbool.h>
 #include "sds.h"
 #include "testhelp.h"
 
@@ -137,11 +138,50 @@ int sdsTest(void) {
     test_cond("sdscatrepr(...data...)",
               memcmp(y,"\"\\a\\n\\x00foo\\r\"",15) == 0)
 
+
     test_report()
+
+
+    return 0;
+}
+
+int sdsTest2() {
+
+    sds x = sdsnew("A..A..hello A.. worldA.....12345678901111111111111111111111111111111");
+    sdstrim(x,"A.");
+    printf("x is :%s",x);
+
+    char flag = x[-1] & 7;
+    printf("flag is %d \n",flag);
+
+    uint8_t dict_hash_function_seed[16];
+    dict_hash_function_seed[0] = 123;
+    dict_hash_function_seed[1] = 123;
+    dict_hash_function_seed[2] = 123;
+    dict_hash_function_seed[3] = 123;
+    dict_hash_function_seed[4] = 123;
+    printf("size of uint8_t is %d \n", sizeof(uint8_t));
+    printf("size of seed is: %d",sizeof(dict_hash_function_seed) * sizeof(uint8_t));
+    int a = 1;
+    int b = 0;
+    int c = -1;
+    if(c) {
+        printf("2 is true \n");
+    }
+    if(a) {
+        printf("1 is true \n");
+    }
+    if(b) {
+        printf("0 is true \n");
+    }
+    bool d = true;
+    if(d) {
+        printf("d is true \n");
+    }
+    sdsfree(x);
     return 0;
 }
 
 int main() {
-    return sdsTest();
+    return sdsTest2();
 }
-

@@ -6,14 +6,12 @@
  *
  *
  */
-
-
 /* 防止重复包含头文件 */
 #ifndef __SDS_H
 
 #define __SDS_H
 
-/** TODO 单位是什么？ SDS的最大的内存 */
+/** 这个常量是1MB，表示字符串扩容的时候，如果现有容量不够，至少扩容1MB */
 #define SDS_MAX_PREALLOC (1024*1024)
 
 // 空的sds
@@ -58,12 +56,18 @@ struct __attribute__ ((__packed__)) sdshdr64 {
     char buf[];
 };
 
+//5种类型
 #define SDS_TYPE_5  0
 #define SDS_TYPE_8  1
 #define SDS_TYPE_16 2
 #define SDS_TYPE_32 3
 #define SDS_TYPE_64 4
+
+//flag的掩码，为什么是7 因为 7 = 111（2进制）
+//这个来拿低3位
 #define SDS_TYPE_MASK 7
+//3个表示在SDS_TYPE_5之中，FLAG字段的低3位，表示flag类型，剩下5位，表示字符长度
+//所以最小的字符串长度是 2^5 = 32
 #define SDS_TYPE_BITS 3
 #define SDS_HDR_VAR(T,s) struct sdshdr##T *sh = (void*)((s)-(sizeof(struct sdshdr##T)));
 #define SDS_HDR(T,s) ((struct sdshdr##T *)((s)-(sizeof(struct sdshdr##T))))
