@@ -1,10 +1,8 @@
-// 双向链表
-
+//普通的双向链表实现
 #ifndef __ADLIST_H__
 #define __ADLIST_H__
 
-/* Node, List, and Iterator are the only data structures used currently. */
-
+//目前仅用 Node List Iterator
 typedef struct listNode {
     struct listNode *prev;
     struct listNode *next;
@@ -25,7 +23,7 @@ typedef struct list {
     unsigned long len;
 } list;
 
-/* Functions implemented as macros */
+//以下是用宏实现的方法
 #define listLength(l) ((l)->len)
 #define listFirst(l) ((l)->head)
 #define listLast(l) ((l)->tail)
@@ -61,6 +59,8 @@ void listRotate(list *list);
 void listJoin(list *l, list *o);
 
 /* Directions for iterators */
+
+//迭代器是从头开始遍历，还是从尾开始遍历
 #define AL_START_HEAD 0
 #define AL_START_TAIL 1
 
