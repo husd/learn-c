@@ -36,18 +36,15 @@ int setTypeAdd(robj *subject, sds value) {
             uint8_t success = 0;
             subject->ptr = intsetAdd(subject->ptr,llval,&success);
             if (success) {
-                /* Convert to regular set when the intset contains
-                 * too many entries. */
+                //太多了就从intset转换为dict,临界值 = config get set_max_intset_entries 默认是512个
                 if (intsetLen(subject->ptr) > server.set_max_intset_entries)
                     setTypeConvert(subject,OBJ_ENCODING_HT);
                 return 1;
             }
         } else {
-            /* Failed to get integer from object, convert to regular set. */
+            //如果之前一直是加入的int，突然有不能转换为数字的值被添加进来
+            //就需要把这个intset转换为字典来处理,字典是一个通用型的结构
             setTypeConvert(subject,OBJ_ENCODING_HT);
-
-            /* The set *was* an intset and this value is not integer
-             * encodable, so dictAdd should always work. */
             serverAssert(dictAdd(subject->ptr,sdsdup(value),NULL) == DICT_OK);
             return 1;
         }
@@ -214,10 +211,10 @@ void setTypeConvert(robj *setobj, int enc) {
         dict *d = dictCreate(&setDictType,NULL);
         sds element;
 
-        /* Presize the dict to avoid rehashing */
+        // 预先扩容好了，省的rehash
         dictExpand(d,intsetLen(setobj->ptr));
 
-        /* To add the elements we extract integers and create redis objects */
+        //遍历所有的intset，把每个元素转换成sds，然后添加到字典里
         si = setTypeInitIterator(setobj);
         while (setTypeNext(si,&element,&intele) != -1) {
             element = sdsfromlonglong(intele);

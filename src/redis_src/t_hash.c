@@ -8,9 +8,9 @@
  * Hash type API
  *----------------------------------------------------------------------------*/
 
-/* Check the length of a number of objects to see if we need to convert a
- * ziplist to a real hash. Note that we only check string encoded objects
- * as their string length can be queried in constant time. */
+//检查是否需要把ziplist转换为1个真正的hash
+//注意，我们只检查字符串编码的对象，因为它们的字符串长度可以在恒定时间内查询
+//这个检查的是字符串的长度，不是字符串的数量
 void hashTypeTryConversion(robj *o, robj **argv, int start, int end) {
     int i;
 
@@ -26,8 +26,6 @@ void hashTypeTryConversion(robj *o, robj **argv, int start, int end) {
     }
 }
 
-/* Get the value from a ziplist encoded hash, identified by field.
- * Returns -1 when the field cannot be found. */
 int hashTypeGetFromZiplist(robj *o, sds field,
                            unsigned char **vstr,
                            unsigned int *vlen,
@@ -58,9 +56,7 @@ int hashTypeGetFromZiplist(robj *o, sds field,
     return -1;
 }
 
-/* Get the value from a hash table encoded hash, identified by field.
- * Returns NULL when the field cannot be found, otherwise the SDS value
- * is returned. */
+//从hash里取值
 sds hashTypeGetFromHashTable(robj *o, sds field) {
     dictEntry *de;
 
@@ -152,24 +148,7 @@ int hashTypeExists(robj *o, sds field) {
     return 0;
 }
 
-/* Add a new field, overwrite the old with the new value if it already exists.
- * Return 0 on insert and 1 on update.
- *
- * By default, the key and value SDS strings are copied if needed, so the
- * caller retains ownership of the strings passed. However this behavior
- * can be effected by passing appropriate flags (possibly bitwise OR-ed):
- *
- * HASH_SET_TAKE_FIELD -- The SDS field ownership passes to the function.
- * HASH_SET_TAKE_VALUE -- The SDS value ownership passes to the function.
- *
- * When the flags are used the caller does not need to release the passed
- * SDS string(s). It's up to the function to use the string to create a new
- * entry or to free the SDS string before returning to the caller.
- *
- * HASH_SET_COPY corresponds to no flags passed, and means the default
- * semantics of copying the values if needed.
- *
- */
+//hset key field value的实现方法
 #define HASH_SET_TAKE_FIELD (1<<0)
 #define HASH_SET_TAKE_VALUE (1<<1)
 #define HASH_SET_COPY 0
@@ -261,6 +240,7 @@ int hashTypeDelete(robj *o, sds field) {
         if (fptr != NULL) {
             fptr = ziplistFind(fptr, (unsigned char*)field, sdslen(field), 1);
             if (fptr != NULL) {
+                //连续删除2个值，说明key value是挨着的
                 zl = ziplistDelete(zl,&fptr); /* Delete the key. */
                 zl = ziplistDelete(zl,&fptr); /* Delete the value. */
                 o->ptr = zl;
@@ -286,6 +266,7 @@ unsigned long hashTypeLength(const robj *o) {
     unsigned long length = ULONG_MAX;
 
     if (o->encoding == OBJ_ENCODING_ZIPLIST) {
+        //从这里可以看出来，hash用ziplist存储的时候，是field value field value这样存的
         length = ziplistLen(o->ptr) / 2;
     } else if (o->encoding == OBJ_ENCODING_HT) {
         length = dictSize((const dict*)o->ptr);

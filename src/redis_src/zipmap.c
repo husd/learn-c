@@ -1,79 +1,37 @@
-/*** TODO husd ***/
-/* String -> String Map data structure optimized for size.
- * This file implements a data structure mapping strings to other strings
- * implementing an O(n) lookup data structure designed to be very memory
- * efficient.
- *
- * The Redis Hash type uses this data structure for hashes composed of a small
- * number of elements, to switch to a hash table once a given number of
- * elements is reached.
- *
- * Given that many times Redis Hashes are used to represent objects composed
- * of few fields, this is a very big win in terms of used memory.
- *
- * --------------------------------------------------------------------------
- *
- * Copyright (c) 2009-2010, Salvatore Sanfilippo <antirez at gmail dot com>
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- *   * Redistributions of source code must retain the above copyright notice,
- *     this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of Redis nor the names of its contributors may be used
- *     to endorse or promote products derived from this software without
- *     specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- */
+//zipmap也是为了节省空间设计的
+//当map的容量不大的时候，浪费空间严重
+//zipmap实现了 O(n)的时间复杂度，但是会很节省内存
 
-/* Memory layout of a zipmap, for the map "foo" => "bar", "hello" => "world":
+/* 内存布局如下：
+ *
+ * 假如有2个KEY：
+ * "foo" => "bar",
+ * "hello" => "world"
+ *
+ * zipmap里的元素大于254个的时候，第一个元素zmlen就不准了，得全量遍历一遍才行
+ * zipmap的结构如下
  *
  * <zmlen><len>"foo"<len><free>"bar"<len>"hello"<len><free>"world"
  *
- * <zmlen> is 1 byte length that holds the current size of the zipmap.
- * When the zipmap length is greater than or equal to 254, this value
- * is not used and the zipmap needs to be traversed to find out the length.
+ * <zmlen> 1字节大小，表示zipmap的容量，最大254，超出了就得遍历
  *
- * <len> is the length of the following string (key or value).
- * <len> lengths are encoded in a single value or in a 5 bytes value.
- * If the first byte value (as an unsigned 8 bit value) is between 0 and
- * 253, it's a single-byte length. If it is 254 then a four bytes unsigned
- * integer follows (in the host byte ordering). A value of 255 is used to
- * signal the end of the hash.
+ * <len> 接下来的key value的字符串的长度
+ * <len> 有2种情况，最多5个字节，如果第一个字节 0 <= len <= 253 就表示长度
+ * 如果是 len > 253 ,那么剩下的4个字节，无符号整数，表示长度
  *
- * <free> is the number of free unused bytes after the string, resulting
- * from modification of values associated to a key. For instance if "foo"
- * is set to "bar", and later "foo" will be set to "hi", it will have a
- * free byte to use if the value will enlarge again later, or even in
- * order to add a key/value pair if it fits.
+ * 255表示结束(0xff)
  *
- * <free> is always an unsigned 8 bit number, because if after an
- * update operation there are more than a few free bytes, the zipmap will be
- * reallocated to make sure it is as small as possible.
  *
- * The most compact representation of the above two elements hash is actually:
+ * <free> 表示没有使用的字节数
+ *
+ * <free> 总是无符号的8位数字，如果更新操作导致空闲少了，zipmap也会重新扩容内存
+ * 保证空闲会尽量小
+ *
+ * 上面的数据实际如下：
  *
  * "\x02\x03foo\x03\x00bar\x05hello\x05\x00world\xff"
  *
- * Note that because keys and values are prefixed length "objects",
- * the lookup will take O(N) where N is the number of elements
- * in the zipmap and *not* the number of bytes needed to represent the zipmap.
- * This lowers the constant times considerably.
+ * 注意是O(n)的复杂度
  */
 
 #include <stdio.h>
@@ -84,16 +42,10 @@
 #define ZIPMAP_BIGLEN 254
 #define ZIPMAP_END 255
 
-/* The following defines the max value for the <free> field described in the
- * comments above, that is, the max number of trailing bytes in a value. */
 #define ZIPMAP_VALUE_MAX_FREE 4
 
-/* The following macro returns the number of bytes needed to encode the length
- * for the integer value _l, that is, 1 byte for lengths < ZIPMAP_BIGLEN and
- * 5 bytes for all the other lengths. */
 #define ZIPMAP_LEN_BYTES(_l) (((_l) < ZIPMAP_BIGLEN) ? 1 : sizeof(unsigned int)+1)
 
-/* Create a new empty zipmap. */
 unsigned char *zipmapNew(void) {
     unsigned char *zm = zmalloc(2);
 
@@ -102,18 +54,19 @@ unsigned char *zipmapNew(void) {
     return zm;
 }
 
-/* Decode the encoded length pointed by 'p' */
 static unsigned int zipmapDecodeLength(unsigned char *p) {
     unsigned int len = *p;
 
     if (len < ZIPMAP_BIGLEN) return len;
+    //把其它的4个字节，复制到len的地址中 &len是目标地址 p+1是从p之后开始复制 sizeof(unsigned int)表示4个字节的长度
+    //思考下和java在写代码上的区别
+    //思考下低级方法和高级方法
     memcpy(&len,p+1,sizeof(unsigned int));
     memrev32ifbe(&len);
     return len;
 }
 
-/* Encode the length 'l' writing it in 'p'. If p is NULL it just returns
- * the amount of bytes required to encode such a length. */
+//254是一个关键值 最大5字节
 static unsigned int zipmapEncodeLength(unsigned char *p, unsigned int len) {
     if (p == NULL) {
         return ZIPMAP_LEN_BYTES(len);
@@ -130,12 +83,7 @@ static unsigned int zipmapEncodeLength(unsigned char *p, unsigned int len) {
     }
 }
 
-/* Search for a matching key, returning a pointer to the entry inside the
- * zipmap. Returns NULL if the key is not found.
- *
- * If NULL is returned, and totlen is not NULL, it is set to the entire
- * size of the zimap, so that the calling function will be able to
- * reallocate the original zipmap to make room for more entries. */
+//查找key
 static unsigned char *zipmapLookupRaw(unsigned char *zm, unsigned char *key, unsigned int klen, unsigned int *totlen) {
     unsigned char *p = zm+1, *k = NULL;
     unsigned int l,llen;
@@ -147,8 +95,7 @@ static unsigned char *zipmapLookupRaw(unsigned char *zm, unsigned char *key, uns
         l = zipmapDecodeLength(p);
         llen = zipmapEncodeLength(NULL,l);
         if (key != NULL && k == NULL && l == klen && !memcmp(p+llen,key,l)) {
-            /* Only return when the user doesn't care
-             * for the total length of the zipmap. */
+            //只有在用户不关心zipmap的总长度的时候，才会执行到这里
             if (totlen != NULL) {
                 k = p;
             } else {
@@ -156,12 +103,14 @@ static unsigned char *zipmapLookupRaw(unsigned char *zm, unsigned char *key, uns
             }
         }
         p += llen+l;
-        /* Skip the value as well */
+        //如果key不匹配，那么这个时候 ，需要跳过2次 第一次是key的长度
+        //zipmapEncodeLength返回的是value的长度
         l = zipmapDecodeLength(p);
         p += zipmapEncodeLength(NULL,l);
         free = p[0];
         p += l+1+free; /* +1 to skip the free byte */
     }
+    //走到这里是找到了末尾
     if (totlen != NULL) *totlen = (unsigned int)(p-zm)+1;
     return k;
 }
@@ -169,13 +118,15 @@ static unsigned char *zipmapLookupRaw(unsigned char *zm, unsigned char *key, uns
 static unsigned long zipmapRequiredLength(unsigned int klen, unsigned int vlen) {
     unsigned int l;
 
+    // 为啥要+3 ? zmlen + len + end 各占1个字节？
     l = klen+vlen+3;
+
+    //+4是因为要用4个字节表示长度 （1字节最大只能表示254)
     if (klen >= ZIPMAP_BIGLEN) l += 4;
     if (vlen >= ZIPMAP_BIGLEN) l += 4;
     return l;
 }
 
-/* Return the total amount used by a key (encoded length + payload) */
 static unsigned int zipmapRawKeyLength(unsigned char *p) {
     unsigned int l = zipmapDecodeLength(p);
     return zipmapEncodeLength(NULL,l) + l;
@@ -192,9 +143,6 @@ static unsigned int zipmapRawValueLength(unsigned char *p) {
     return used;
 }
 
-/* If 'p' points to a key, this function returns the total amount of
- * bytes used to store this entry (entry = key + associated value + trailing
- * free space if any). */
 static unsigned int zipmapRawEntryLength(unsigned char *p) {
     unsigned int l = zipmapRawKeyLength(p);
     return l + zipmapRawValueLength(p+l);
@@ -347,12 +295,14 @@ int zipmapExists(unsigned char *zm, unsigned char *key, unsigned int klen) {
     return zipmapLookupRaw(zm,key,klen,NULL) != NULL;
 }
 
-/* Return the number of entries inside a zipmap */
+//zipmap的总数量
 unsigned int zipmapLen(unsigned char *zm) {
     unsigned int len = 0;
+    //小于254，直接返回
     if (zm[0] < ZIPMAP_BIGLEN) {
         len = zm[0];
     } else {
+        //大于254，就得1个1个遍历了
         unsigned char *p = zipmapRewind(zm);
         while((p = zipmapNext(p,NULL,NULL,NULL,NULL)) != NULL) len++;
 
@@ -362,10 +312,13 @@ unsigned int zipmapLen(unsigned char *zm) {
     return len;
 }
 
-/* Return the raw size in bytes of a zipmap, so that we can serialize
- * the zipmap on disk (or everywhere is needed) just writing the returned
- * amount of bytes of the C array starting at the zipmap pointer. */
+
+//返回这个zipmap的所有的总长度 totlen，这样就可以直接把zm指针之后的totlen长度的数据
+//复制到另外一个地方，方便做序列化或者其它操作
+//666 这个思想
 size_t zipmapBlobLen(unsigned char *zm) {
+    //这不就是把totlen的地址传过去，在zipmapLookupRaw这个方法里，把地址改了
+    //哈哈 ，熟悉的味道
     unsigned int totlen;
     zipmapLookupRaw(zm,NULL,0,&totlen);
     return totlen;
