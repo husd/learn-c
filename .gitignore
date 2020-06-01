@@ -54,3 +54,6 @@ dkms.conf
 
 .idea
 cmake-build-debug
+/src/redis_src/.make-prerequisites
+/src/redis_src/.make-settings
+/src/redis_src/release.h

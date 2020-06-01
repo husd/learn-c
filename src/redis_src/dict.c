@@ -1,37 +1,4 @@
-/* Hash Tables Implementation.
- *
- * This file implements in memory hash tables with insert/del/replace/find/
- * get-random-element operations. Hash tables will auto resize if needed
- * tables of power of two in size are used, collisions are handled by
- * chaining. See the source code for more information... :)
- *
- * Copyright (c) 2006-2012, Salvatore Sanfilippo <antirez at gmail dot com>
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- *   * Redistributions of source code must retain the above copyright notice,
- *     this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of Redis nor the names of its contributors may be used
- *     to endorse or promote products derived from this software without
- *     specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- */
+//hash tables实现
 
 #include "fmacros.h"
 
@@ -59,7 +26,13 @@
  * Note that even when dict_can_resize is set to 0, not all resizes are
  * prevented: a hash table is still allowed to grow if the ratio between
  * the number of elements and the buckets > dict_force_resize_ratio. */
+
+
+//这个参数如果等于1 ，表示hash table可以扩容或者缩容，如果等于0，仅仅会在当前容量大于阈值
+//的时候可以扩容 N * 0.75 > size
 static int dict_can_resize = 1;
+
+//TODO husd 看看这个参数是什么
 static unsigned int dict_force_resize_ratio = 5;
 
 /* -------------------------- private prototypes ---------------------------- */
@@ -71,6 +44,7 @@ static int _dictInit(dict *ht, dictType *type, void *privDataPtr);
 
 /* -------------------------- hash functions -------------------------------- */
 
+//这个应该是计算hash值的一个种子因素
 static uint8_t dict_hash_function_seed[16];
 
 void dictSetHashFunctionSeed(uint8_t *seed) {
@@ -152,14 +126,24 @@ int dictExpand(dict *d, unsigned long size)
         return DICT_ERR;
 
     dictht n; /* the new hash table */
+
+    //扩容hash table的大小，每次是上一次的2倍
+    //且是2的指数 例如size = 7 return 8 因为8是2的指数第一个大于7的
+    //如果是9 return 16
+    //最长是 MAX_LONG 有符号的 9223372036854775807
     unsigned long realsize = _dictNextPower(size);
 
     /* Rehashing to the same table size is not useful. */
+
+    //扩容之后还是原来的大小，就没有意义了
     if (realsize == d->ht[0].size) return DICT_ERR;
 
     /* Allocate the new hash table and initialize all pointers to NULL */
+
+    //初始化指针
     n.size = realsize;
     n.sizemask = realsize-1;
+    //分配空间
     n.table = zcalloc(realsize*sizeof(dictEntry*));
     n.used = 0;
 
@@ -172,6 +156,7 @@ int dictExpand(dict *d, unsigned long size)
 
     /* Prepare a second hash table for incremental rehashing */
     d->ht[1] = n;
+    //设置为0，就表示下次就随时准备rehash了
     d->rehashidx = 0;
     return DICT_OK;
 }
@@ -185,8 +170,14 @@ int dictExpand(dict *d, unsigned long size)
  * guaranteed that this function will rehash even a single bucket, since it
  * will visit at max N*10 empty buckets in total, otherwise the amount of
  * work it does would be unbound and the function may block for a long time. */
+
+//思考下一个问题？ 如果rehash还没有结束的时候，又触发了一次rehash，该怎么办？
+//阻塞就没有这个问题
+//返回0 表示rehash结束
+//返回1 表示rehash还在继续中
 int dictRehash(dict *d, int n) {
     int empty_visits = n*10; /* Max number of empty buckets to visit. */
+    //没有在rehash，直接返回
     if (!dictIsRehashing(d)) return 0;
 
     while(n-- && d->ht[0].used != 0) {
@@ -218,6 +209,10 @@ int dictRehash(dict *d, int n) {
     }
 
     /* Check if we already rehashed the whole table... */
+
+    //used == 0 表示rehash已经完成了，这个时候ht[1]就要成为新的ht[0]
+    //原来的ht[0]销毁，空间回收
+    //rehashidx = -1表示结束rehash
     if (d->ht[0].used == 0) {
         zfree(d->ht[0].table);
         d->ht[0] = d->ht[1];
@@ -238,6 +233,8 @@ long long timeInMilliseconds(void) {
 }
 
 /* Rehash for an amount of time between ms milliseconds and ms+1 milliseconds */
+//给程序 10ms的时间去rehash，超过了10ms就返回
+//第二个参数就是rehash的时间
 int dictRehashMilliseconds(dict *d, int ms) {
     long long start = timeInMilliseconds();
     int rehashes = 0;
@@ -481,14 +478,21 @@ dictEntry *dictFind(dict *d, const void *key)
     if (d->ht[0].used + d->ht[1].used == 0) return NULL; /* dict is empty */
     if (dictIsRehashing(d)) _dictRehashStep(d);
     h = dictHashKey(d, key);
+    //有2个ht 都要去找
     for (table = 0; table <= 1; table++) {
         idx = h & d->ht[table].sizemask;
+        //这里找到了key所在的元素的桶
+        // d->ht[0].table 当前数组
         he = d->ht[table].table[idx];
+        //拉链表
         while(he) {
+            //java和C是想通的，哈哈
             if (key==he->key || dictCompareKeys(d, key, he->key))
                 return he;
             he = he->next;
         }
+        //这个含义比较隐蔽，意思是如果在ht[0]中没有找到
+        //并且当前也没有做rehash,那么就不用找ht[1]了，直接返回NULL
         if (!dictIsRehashing(d)) return NULL;
     }
     return NULL;
@@ -600,7 +604,8 @@ void dictReleaseIterator(dictIterator *iter)
         if (iter->safe)
             iter->d->iterators--;
         else
-            assert(iter->fingerprint == dictFingerprint(iter->d));
+            //assert(iter->fingerprint == dictFingerprint(iter->d));
+            iter->fingerprint == dictFingerprint(iter->d);
     }
     zfree(iter);
 }
@@ -965,6 +970,8 @@ static int _dictExpandIfNeeded(dict *d)
 }
 
 /* Our hash table capability is a power of two */
+//字典的长度，最小是4 ，最大是 LONG_MAX + 1LU
+//而且永远是2的指数
 static unsigned long _dictNextPower(unsigned long size)
 {
     unsigned long i = DICT_HT_INITIAL_SIZE;

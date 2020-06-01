@@ -1,33 +1,4 @@
-/* quicklist.c - A doubly linked list of ziplists
- *
- * Copyright (c) 2014, Matt Stancliff <matt@genges.com>
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- *   * Redistributions of source code must start the above copyright notice,
- *     this quicklist of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this quicklist of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of Redis nor the names of its contributors may be used
- *     to endorse or promote products derived from this software without
- *     specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- */
-
+//双向列表 实现
 #include <string.h> /* for memcpy */
 #include "quicklist.h"
 #include "zmalloc.h"
@@ -43,19 +14,20 @@
 #define REDIS_STATIC static
 #endif
 
-/* Optimization levels for size-based filling */
+//链表在以下长度的时候，会触发优化操作
 static const size_t optimization_level[] = {4096, 8192, 16384, 32768, 65536};
 
 /* Maximum size in bytes of any multi-element ziplist.
  * Larger values will live in their own isolated ziplists. */
+//每个节点，最大是8192个字节 更大的值，就只能在ziplist自己的节点中存储了
+//这个翻译可能不太准确
 #define SIZE_SAFETY_LIMIT 8192
 
-/* Minimum ziplist size in bytes for attempting compression. */
+/*  ziplist如果是小于48字节，就不压缩了  */
 #define MIN_COMPRESS_BYTES 48
 
-/* Minimum size reduction in bytes to store compressed quicklistNode data.
- * This also prevents us from storing compression if the compression
- * resulted in a larger size than the original data. */
+//压缩之后，最小要节省8个字节，如果压缩之后节省了不到8个字节，甚至比压缩之前还大
+//那么就不能进行压缩了
 #define MIN_COMPRESS_IMPROVE 8
 
 /* If not verbose testing, remove all debug printing. */
@@ -180,13 +152,14 @@ REDIS_STATIC int __quicklistCompressNode(quicklistNode *node) {
     node->attempted_compress = 1;
 #endif
 
-    /* Don't bother compressing small values */
+    //很明显，太小，不压缩
     if (node->sz < MIN_COMPRESS_BYTES)
         return 0;
 
     quicklistLZF *lzf = zmalloc(sizeof(*lzf) + node->sz);
 
-    /* Cancel if compression fails or doesn't compress small enough */
+    //看看压缩有没有效果，如果压缩之后，节省的空间不到8字节，那么就释放空间
+    //lzf_compress如果有漏洞，可能会导致redis有性能问题
     if (((lzf->sz = lzf_compress(node->zl, node->sz, lzf->compressed,
                                  node->sz)) == 0) ||
         lzf->sz + MIN_COMPRESS_IMPROVE >= node->sz) {
@@ -202,7 +175,8 @@ REDIS_STATIC int __quicklistCompressNode(quicklistNode *node) {
     return 1;
 }
 
-/* Compress only uncompressed nodes. */
+//这种do{}while(0)的办法，真是绝了
+//后面的反斜杠也是之前不知道
 #define quicklistCompressNode(_node)                                           \
     do {                                                                       \
         if ((_node) && (_node)->encoding == QUICKLIST_NODE_ENCODING_RAW) {     \
@@ -210,8 +184,7 @@ REDIS_STATIC int __quicklistCompressNode(quicklistNode *node) {
         }                                                                      \
     } while (0)
 
-/* Uncompress the ziplist in 'node' and update encoding details.
- * Returns 1 on successful decode, 0 on failure to decode. */
+//解压缩节点
 REDIS_STATIC int __quicklistDecompressNode(quicklistNode *node) {
 #ifdef REDIS_TEST
     node->attempted_compress = 0;
@@ -219,6 +192,7 @@ REDIS_STATIC int __quicklistDecompressNode(quicklistNode *node) {
 
     void *decompressed = zmalloc(node->sz);
     quicklistLZF *lzf = (quicklistLZF *)node->zl;
+    //lzf_decompress也相当于一个工具类了
     if (lzf_decompress(lzf->compressed, lzf->sz, decompressed, node->sz) == 0) {
         /* Someone requested decompress, but we can't decompress.  Not good. */
         zfree(decompressed);
@@ -271,6 +245,8 @@ REDIS_STATIC void __quicklistCompress(const quicklist *quicklist,
         return;
 
 #if 0
+    //这个优化意义不大？ 所以注释掉了？
+    //其实可以优化到10？ 效果会更好?
     /* Optimized cases for small depth counts */
     if (quicklist->compress == 1) {
         quicklistNode *h = quicklist->head, *t = quicklist->tail;
@@ -306,6 +282,10 @@ REDIS_STATIC void __quicklistCompress(const quicklist *quicklist,
     quicklistNode *reverse = quicklist->tail;
     int depth = 0;
     int in_depth = 0;
+    //设置了头和尾巴2个指针，依次向中间进行遍历
+    //所以压缩的深度如果是1 一共最多有2个元素被压缩 头 + 尾
+    //压缩的深度如果是2 一共最多4个 前2个和后2个
+    //依次类推
     while (depth++ < quicklist->compress) {
         quicklistDecompressNode(forward);
         quicklistDecompressNode(reverse);
@@ -313,6 +293,7 @@ REDIS_STATIC void __quicklistCompress(const quicklist *quicklist,
         if (forward == node || reverse == node)
             in_depth = 1;
 
+        //相遇
         if (forward == reverse)
             return;
 
@@ -417,6 +398,9 @@ _quicklistNodeSizeMeetsOptimizationRequirement(const size_t sz,
 
 #define sizeMeetsSafetyLimit(sz) ((sz) <= SIZE_SAFETY_LIMIT)
 
+//判断当前的节点，是否允许再插入新的元素
+//quicklistNode是一个ziplist，ziplist在容量很大的时候，性能就不好，所以
+//quicklist就判断下这个node能不能再新增数据了
 REDIS_STATIC int _quicklistNodeAllowInsert(const quicklistNode *node,
                                            const int fill, const size_t sz) {
     if (unlikely(!node))
@@ -473,10 +457,12 @@ REDIS_STATIC int _quicklistNodeAllowMerge(const quicklistNode *a,
         (node)->sz = ziplistBlobLen((node)->zl);                               \
     } while (0)
 
-/* Add new entry to head node of quicklist.
+/*
  *
- * Returns 0 if used existing head.
- * Returns 1 if new head created. */
+ * 向头节点中增加一个元素 ，如果没有新增加节点，使用了现在的头节点，返回0
+ * 如果新增了一个节点，把该元素放在了新节点中，返回1
+ *
+ * */
 int quicklistPushHead(quicklist *quicklist, void *value, size_t sz) {
     quicklistNode *orig_head = quicklist->head;
     if (likely(
@@ -591,8 +577,8 @@ REDIS_STATIC void __quicklistDelNode(quicklist *quicklist,
         quicklist->head = node->next;
     }
 
-    /* If we deleted a node within our compress depth, we
-     * now have compressed nodes needing to be decompressed. */
+    //如果删除了一个在我们压缩深度的节点，就需要把中间压缩的数据解压缩以下
+    //这样下次拿数据的时候，就能快速拿到数据了
     __quicklistCompress(quicklist, NULL);
 
     quicklist->count -= node->count;

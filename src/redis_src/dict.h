@@ -1,37 +1,4 @@
-/* Hash Tables Implementation.
- *
- * This file implements in-memory hash tables with insert/del/replace/find/
- * get-random-element operations. Hash tables will auto-resize if needed
- * tables of power of two in size are used, collisions are handled by
- * chaining. See the source code for more information... :)
- *
- * Copyright (c) 2006-2012, Salvatore Sanfilippo <antirez at gmail dot com>
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- *   * Redistributions of source code must retain the above copyright notice,
- *     this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of Redis nor the names of its contributors may be used
- *     to endorse or promote products derived from this software without
- *     specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- */
+//hash tables实现
 
 #include <stdint.h>
 
@@ -44,29 +11,45 @@
 /* Unused arguments generate annoying warnings... */
 #define DICT_NOTUSED(V) ((void) V)
 
+//这个结构是字典的桶
 typedef struct dictEntry {
+    //void * 表示可以指向任意值
     void *key;
     union {
+        //val也可以是任意值
         void *val;
+
+        //TODO husd 下面这3个是干啥用的 ？
         uint64_t u64;
         int64_t s64;
         double d;
     } v;
+    // 拉链表
     struct dictEntry *next;
 } dictEntry;
 
 typedef struct dictType {
+
+    //hash算法
     uint64_t (*hashFunction)(const void *key);
+
+    //rehash的复制？
     void *(*keyDup)(void *privdata, const void *key);
     void *(*valDup)(void *privdata, const void *obj);
     int (*keyCompare)(void *privdata, const void *key1, const void *key2);
+
+    //这2个是释放空间的
     void (*keyDestructor)(void *privdata, void *key);
     void (*valDestructor)(void *privdata, void *obj);
 } dictType;
 
 /* This is our hash table structure. Every dictionary has two of this as we
  * implement incremental rehashing, for the old to the new table. */
+
+//hash table的结构，ht[0] 和ht[1] 在不存在rehash的时候，从ht[0]中取值
+//在rehash过程中，从ht[0]和ht[1]中都要找
 typedef struct dictht {
+    //2维数组
     dictEntry **table;
     unsigned long size;
     unsigned long sizemask;
@@ -81,10 +64,9 @@ typedef struct dict {
     unsigned long iterators; /* number of iterators currently running */
 } dict;
 
-/* If safe is set to 1 this is a safe iterator, that means, you can call
- * dictAdd, dictFind, and other functions against the dictionary even while
- * iterating. Otherwise it is a non safe iterator, and only dictNext()
- * should be called while iterating. */
+// 如果safe = 1，那么就是一个安全的迭代器，可以在迭代过程中新增、查找、删除 或其它操作
+// 如果 safe != 1 ，那么迭代的时候，就只能去调用dictNext()方法
+
 typedef struct dictIterator {
     dict *d;
     long index;
@@ -98,6 +80,8 @@ typedef void (dictScanFunction)(void *privdata, const dictEntry *de);
 typedef void (dictScanBucketFunction)(void *privdata, dictEntry **bucketref);
 
 /* This is the initial size of every hash table */
+
+//hash table初始化是4
 #define DICT_HT_INITIAL_SIZE     4
 
 /* ------------------------------- Macros ------------------------------------*/

@@ -1,96 +1,55 @@
-/* The ziplist is a specially encoded dually linked list that is designed
- * to be very memory efficient. It stores both strings and integer values,
- * where integers are encoded as actual integers instead of a series of
- * characters. It allows push and pop operations on either side of the list
- * in O(1) time. However, because every operation requires a reallocation of
- * the memory used by the ziplist, the actual complexity is related to the
- * amount of memory used by the ziplist.
+/*
+ *
+ * 经过特殊编码的linked list，内存利用率非常高效 可以同时存储string和int int存的就是数字
+ * 从list的两头增加或者取出都是O（1）的时间复杂度，但是因为每个操作都需要重新分配空间，实际的
+ * 时间复杂度和ziplist已使用的内存大小有关
  *
  * ----------------------------------------------------------------------------
  *
- * ZIPLIST OVERALL LAYOUT
- * ======================
- *
- * The general layout of the ziplist is as follows:
+ * 大概这个样子：
  *
  * <zlbytes> <zltail> <zllen> <entry> <entry> ... <entry> <zlend>
  *
- * NOTE: all fields are stored in little endian, if not specified otherwise.
+ * 不特殊指定的话，都是小端存储
  *
- * <uint32_t zlbytes> is an unsigned integer to hold the number of bytes that
- * the ziplist occupies, including the four bytes of the zlbytes field itself.
- * This value needs to be stored to be able to resize the entire structure
- * without the need to traverse it first.
+ * <uint32总长度> <uint32尾巴> <uint16实际长度> <元素><元素> .... <元素> <固定编码255>
  *
- * <uint32_t zltail> is the offset to the last entry in the list. This allows
- * a pop operation on the far side of the list without the need for full
- * traversal.
- *
- * <uint16_t zllen> is the number of entries. When there are more than
- * 2^16-2 entries, this value is set to 2^16-1 and we need to traverse the
- * entire list to know how many items it holds.
- *
- * <uint8_t zlend> is a special entry representing the end of the ziplist.
- * Is encoded as a single byte equal to 255. No other normal entry starts
- * with a byte set to the value of 255.
- *
- * ZIPLIST ENTRIES
+ * ZIPLIST 元素 prevlen是为了可以从后向前遍历
  * ===============
- *
- * Every entry in the ziplist is prefixed by metadata that contains two pieces
- * of information. First, the length of the previous entry is stored to be
- * able to traverse the list from back to front. Second, the entry encoding is
- * provided. It represents the entry type, integer or string, and in the case
- * of strings it also represents the length of the string payload.
- * So a complete entry is stored like this:
  *
  * <prevlen> <encoding> <entry-data>
  *
- * Sometimes the encoding represents the entry itself, like for small integers
- * as we'll see later. In such a case the <entry-data> part is missing, and we
- * could have just:
+ * encoding就可以表示数据了，就不要entry-data了，例如int
  *
  * <prevlen> <encoding>
  *
- * The length of the previous entry, <prevlen>, is encoded in the following way:
- * If this length is smaller than 254 bytes, it will only consume a single
- * byte representing the length as an unsinged 8 bit integer. When the length
- * is greater than or equal to 254, it will consume 5 bytes. The first byte is
- * set to 254 (FE) to indicate a larger value is following. The remaining 4
- * bytes take the length of the previous entry as value.
+ *  如果前1个元素长度小于254：
  *
- * So practically an entry is encoded in the following way:
+ * <0~253> <encoding> <entry>
  *
- * <prevlen from 0 to 253> <encoding> <entry>
- *
- * Or alternatively if the previous entry length is greater than 253 bytes
- * the following encoding is used:
+ * 如果 >= 254
  *
  * 0xFE <4 bytes unsigned little endian prevlen> <encoding> <entry>
  *
- * The encoding field of the entry depends on the content of the
- * entry. When the entry is a string, the first 2 bits of the encoding first
- * byte will hold the type of encoding used to store the length of the string,
- * followed by the actual length of the string. When the entry is an integer
- * the first 2 bits are both set to 1. The following 2 bits are used to specify
- * what kind of integer will be stored after this header. An overview of the
- * different types and encodings is as follows. The first byte is always enough
- * to determine the kind of entry.
+ *  每个元素的值，都根据实际的情况，进行了压缩 首选判断前2个bits是什么
+ *  所有的情况如下：
  *
  * |00pppppp| - 1 byte
- *      String value with length less than or equal to 63 bytes (6 bits).
- *      "pppppp" represents the unsigned 6 bit length.
+ *  00 开头，剩下的6bits最大表示63，可以表示<=63长度的字符串
+ *
  * |01pppppp|qqqqqqqq| - 2 bytes
- *      String value with length less than or equal to 16383 bytes (14 bits).
- *      IMPORTANT: The 14 bit number is stored in big endian.
+ *      01开头 剩下14位，可以表示 16383 bytes (14 bits)
+ *      注意（重要）： 14位的数字用大端表示法
+ *
  * |10000000|qqqqqqqq|rrrrrrrr|ssssssss|tttttttt| - 5 bytes
- *      String value with length greater than or equal to 16384 bytes.
- *      Only the 4 bytes following the first byte represents the length
- *      up to 32^2-1. The 6 lower bits of the first byte are not used and
- *      are set to zero.
- *      IMPORTANT: The 32 bit number is stored in big endian.
- * |11000000| - 3 bytes
+ *      5字节 10 000000 开头 表示 16384 bytes. (16M)
+ *      10 000000 中6个低位的bits固定是0
+ *      注意（重要）： 32位的数字用大端表示法
+ *
+ * |11000000| - 3 bytes (3bytes表示 总长度是3字节，前1个字节是 11000000 后2个字节表示实际的数据
+ *                      实际的数据是 int16_t ，以下同理)
  *      Integer encoded as int16_t (2 bytes).
+ *
  * |11010000| - 5 bytes
  *      Integer encoded as int32_t (4 bytes).
  * |11100000| - 9 bytes
@@ -99,84 +58,50 @@
  *      Integer encoded as 24 bit signed (3 bytes).
  * |11111110| - 2 bytes
  *      Integer encoded as 8 bit signed (1 byte).
- * |1111xxxx| - (with xxxx between 0000 and 1101) immediate 4 bit integer.
- *      Unsigned integer from 0 to 12. The encoded value is actually from
- *      1 to 13 because 0000 and 1111 can not be used, so 1 should be
- *      subtracted from the encoded 4 bit value to obtain the right value.
+ * |1111xxxx| -
+ *      XXXX的范围是 0000 ～ 1101 4位表示0～12 但是实际是上1～13，因为 0000 和 1111
+ *      是特殊的数字，不能用,所以如果 xxxx = 3, 实际的值是2 ，逻辑上要减去1
+ *
+ *      备注：存的时候要加1
+ *
+ *
  * |11111111| - End of ziplist special entry.
  *
- * Like for the ziplist header, all the integers are represented in little
- * endian byte order, even when this code is compiled in big endian systems.
+   int都是小端，即使用大端的编译器编译
  *
  * EXAMPLES OF ACTUAL ZIPLISTS
  * ===========================
- *
- * The following is a ziplist containing the two elements representing
- * the strings "2" and "5". It is composed of 15 bytes, that we visually
- * split into sections:
  *
  *  [0f 00 00 00] [0c 00 00 00] [02 00] [00 f3] [02 f6] [ff]
  *        |             |          |       |       |     |
  *     zlbytes        zltail    entries   "2"     "5"   end
  *
- * The first 4 bytes represent the number 15, that is the number of bytes
- * the whole ziplist is composed of. The second 4 bytes are the offset
- * at which the last ziplist entry is found, that is 12, in fact the
- * last entry, that is "5", is at offset 12 inside the ziplist.
- * The next 16 bit integer represents the number of elements inside the
- * ziplist, its value is 2 since there are just two elements inside.
- * Finally "00 f3" is the first entry representing the number 2. It is
- * composed of the previous entry length, which is zero because this is
- * our first entry, and the byte F3 which corresponds to the encoding
- * |1111xxxx| with xxxx between 0001 and 1101. We need to remove the "F"
- * higher order bits 1111, and subtract 1 from the "3", so the entry value
- * is "2". The next entry has a prevlen of 02, since the first entry is
- * composed of exactly two bytes. The entry itself, F6, is encoded exactly
- * like the first entry, and 6-1 = 5, so the value of the entry is 5.
- * Finally the special entry FF signals the end of the ziplist.
+ *  0f = 15 表示总长度 = 15个字节
+ *  0c = 12 表示末尾在12，这样就是倒序查询
+ *  02 = 2 表示ziplist一共有2个元素
+ *  f3 = 2
+ *  f6 = 5
+ *  ff表示ziplist的结束
  *
- * Adding another element to the above string with the value "Hello World"
- * allows us to show how the ziplist encodes small strings. We'll just show
- * the hex dump of the entry itself. Imagine the bytes as following the
- * entry that stores "5" in the ziplist above:
+ *  对上面的一段解释 尤其是 f3 =2 的原因 f6 = 5的原因
+ *  可以看到这个ziplist的每个元素的长度，不是对齐的，避免了内存空间的浪费
+ *  但是增加了算法的复杂度
+ *
+ * 设想下，在上面的ziplist后面追加一个hello world
  *
  * [02] [0b] [48 65 6c 6c 6f 20 57 6f 72 6c 64]
  *
- * The first byte, 02, is the length of the previous entry. The next
- * byte represents the encoding in the pattern |00pppppp| that means
- * that the entry is a string of length <pppppp>, so 0B means that
- * an 11 bytes string follows. From the third byte (48) to the last (64)
- * there are just the ASCII characters for "Hello World".
+ *  02 表示前一个元素 "5" 有2个字节长度
+ *  0b 要拆开看 0的前缀，表示存的是个字符串 b=11 表示这个字符串有11个长度
+ *  接下来的就是hello world的编码了
+ *
+ *  所以加完之后是:
+ *
+ *  [1b 00 00 00] [0e 00 00 00] [02 00] [00 f3] [02 f6] { [02] [0b] [48 65 6c 6c 6f 20 57 6f 72 6c 64] } [ff]
+ *
  *
  * ----------------------------------------------------------------------------
  *
- * Copyright (c) 2009-2012, Pieter Noordhuis <pcnoordhuis at gmail dot com>
- * Copyright (c) 2009-2017, Salvatore Sanfilippo <antirez at gmail dot com>
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- *   * Redistributions of source code must retain the above copyright notice,
- *     this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of Redis nor the names of its contributors may be used
- *     to endorse or promote products derived from this software without
- *     specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <stdio.h>
@@ -199,16 +124,18 @@
                                representing the previous entry len. */
 
 /* Different encoding/length possibilities */
-#define ZIP_STR_MASK 0xc0
-#define ZIP_INT_MASK 0x30
-#define ZIP_STR_06B (0 << 6)
-#define ZIP_STR_14B (1 << 6)
-#define ZIP_STR_32B (2 << 6)
-#define ZIP_INT_16B (0xc0 | 0<<4)
-#define ZIP_INT_32B (0xc0 | 1<<4)
-#define ZIP_INT_64B (0xc0 | 2<<4)
-#define ZIP_INT_24B (0xc0 | 3<<4)
-#define ZIP_INT_8B 0xfe
+
+#define ZIP_STR_MASK 0xc0 // 11000000
+#define ZIP_INT_MASK 0x30 // 11000000
+#define ZIP_STR_06B (0 << 6) // 00000000
+#define ZIP_STR_14B (1 << 6) // 1000000
+#define ZIP_STR_32B (2 << 6) // 10000000
+
+#define ZIP_INT_16B (0xc0 | 0<<4) //11000000
+#define ZIP_INT_32B (0xc0 | 1<<4) //11010000
+#define ZIP_INT_64B (0xc0 | 2<<4) //11100000
+#define ZIP_INT_24B (0xc0 | 3<<4) //11110000
+#define ZIP_INT_8B 0xfe     //11111110
 
 /* 4 bit integer immediate encoding |1111xxxx| with xxxx between
  * 0001 and 1101. */
@@ -475,15 +402,14 @@ unsigned int zipRawEntryLength(unsigned char *p) {
     return prevlensize + lensize + len;
 }
 
-/* Check if string pointed to by 'entry' can be encoded as an integer.
- * Stores the integer value in 'v' and its encoding in 'encoding'. */
+
+//尽可能用int来表示string
 int zipTryEncoding(unsigned char *entry, unsigned int entrylen, long long *v, unsigned char *encoding) {
     long long value;
 
     if (entrylen >= 32 || entrylen == 0) return 0;
     if (string2ll((char*)entry,entrylen,&value)) {
-        /* Great, the string can be encoded. Check what's the smallest
-         * of our encoding types that can hold this value. */
+        //可以用int表示string ，还可以用更小的数字来表示
         if (value >= 0 && value <= 12) {
             *encoding = ZIP_INT_IMM_MIN+value;
         } else if (value >= INT8_MIN && value <= INT8_MAX) {
@@ -984,12 +910,8 @@ unsigned char *ziplistIndex(unsigned char *zl, int index) {
     return (p[0] == ZIP_END || index > 0) ? NULL : p;
 }
 
-/* Return pointer to next entry in ziplist.
- *
- * zl is the pointer to the ziplist
- * p is the pointer to the current element
- *
- * The element after 'p' is returned, otherwise NULL if we are at the end. */
+//返回元素p之后的下一个元素
+//如果P已经是尾巴，返回NULL
 unsigned char *ziplistNext(unsigned char *zl, unsigned char *p) {
     ((void) zl);
 
@@ -1078,7 +1000,7 @@ unsigned char *ziplistDeleteRange(unsigned char *zl, int index, unsigned int num
 
 /* Compare entry pointer to by 'p' with 'sstr' of length 'slen'. */
 /* Return 1 if equal. */
-unsigned int ziplistCompare(unsigned char *p, unsigned char *sstr, unsigned int slen) {
+unsigned int  ziplistCompare(unsigned char *p, unsigned char *sstr, unsigned int slen) {
     zlentry entry;
     unsigned char sencoding;
     long long zval, sval;

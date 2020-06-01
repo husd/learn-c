@@ -1,3 +1,4 @@
+/*** TODO husd ***/
 /* rio.c is a simple stream-oriented I/O abstraction that provides an interface
  * to write code that can consume/produce data using different concrete input
  * and output devices. For instance the same rdb.c code using the rio

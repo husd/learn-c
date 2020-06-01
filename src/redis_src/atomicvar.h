@@ -1,3 +1,4 @@
+/*** TODO husd ***/
 /* This file implements atomic counters using __atomic or __sync macros if
  * available, otherwise synchronizing different threads using a mutex.
  *

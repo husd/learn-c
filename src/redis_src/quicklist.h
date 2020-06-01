@@ -1,37 +1,9 @@
-/* quicklist.h - A generic doubly linked quicklist implementation
- *
- * Copyright (c) 2014, Matt Stancliff <matt@genges.com>
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- *   * Redistributions of source code must retain the above copyright notice,
- *     this quicklist of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this quicklist of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of Redis nor the names of its contributors may be used
- *     to endorse or promote products derived from this software without
- *     specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- */
+//双向列表 实现
 
 #ifndef __QUICKLIST_H__
 #define __QUICKLIST_H__
 
-/* Node, quicklist, and Iterator are the only data structures used currently. */
+
 
 /* quicklistNode is a 32 byte struct describing a ziplist for a quicklist.
  * We use bit fields keep the quicklistNode at 32 bytes.
@@ -41,6 +13,16 @@
  * recompress: 1 bit, bool, true if node is temporarry decompressed for usage.
  * attempted_compress: 1 bit, boolean, used for verifying during testing.
  * extra: 10 bits, free for future use; pads out the remainder of 32 bits */
+
+//这里遇到了一个之前没有遇到过的冒号的用法
+
+//结构体中的冒号表示位域。
+//位域出现的原因是由于某些信息的存储表示只需要几个bit位就可以表示而不需要一个完整的字节，同时也是为了节省存储空间和方便处理。
+// 16+2+2+2+1+1+10 正好是32个长度 ，1个int就可以表示了
+// 这样也太省空间了
+
+//quicklist这样设计，那么它的长度是有上限的，在内存足够的情况下，最大的长度是 1<<16 65536
+//实际上会小于32k
 typedef struct quicklistNode {
     struct quicklistNode *prev;
     struct quicklistNode *next;
@@ -54,11 +36,7 @@ typedef struct quicklistNode {
     unsigned int extra : 10; /* more bits to steal for future usage */
 } quicklistNode;
 
-/* quicklistLZF is a 4+N byte struct holding 'sz' followed by 'compressed'.
- * 'sz' is byte length of 'compressed' field.
- * 'compressed' is LZF data with total (compressed) length 'sz'
- * NOTE: uncompressed length is stored in quicklistNode->sz.
- * When quicklistNode->zl is compressed, node->zl points to a quicklistLZF */
+//为了压缩的
 typedef struct quicklistLZF {
     unsigned int sz; /* LZF size in bytes*/
     char compressed[];
@@ -73,10 +51,13 @@ typedef struct quicklistLZF {
 typedef struct quicklist {
     quicklistNode *head;
     quicklistNode *tail;
-    unsigned long count;        /* total count of all entries in all ziplists */
-    unsigned long len;          /* number of quicklistNodes */
-    int fill : 16;              /* fill factor for individual nodes */
-    unsigned int compress : 16; /* depth of end nodes not to compress;0=off */
+    unsigned long count;        /*  quicklist 里所有元素的数量 */
+    unsigned long len;          /* quicklist 里的节点的数量 */
+    int fill : 16;              /*  单个节点的填充因子 */
+    unsigned int compress : 16; /* 不压缩的结束节点的深度；由list-compress-depth给定 0=关闭 */
+    //1 表示quicklist两端各有一个节点不压缩，中间的节点压缩
+    //2 表示quicklist两端各有两个节点不压缩，中间的节点压缩
+    //依次类推
 } quicklist;
 
 typedef struct quicklistIter {

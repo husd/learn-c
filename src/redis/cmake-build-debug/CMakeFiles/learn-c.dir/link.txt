@@ -1,1 +1,0 @@
-/usr/bin/gcc -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names -L/usr/local/opt/openssl/lib CMakeFiles/learn-c.dir/sds.c.o CMakeFiles/learn-c.dir/sds_small.c.o CMakeFiles/learn-c.dir/zmalloc.c.o  -o learn-c -lm 
