@@ -981,8 +981,7 @@ struct redisCommand redisCommandTable[] = {
  * function of Redis may be called from other threads. */
 void nolocks_localtime(struct tm *tmp, time_t t, time_t tz, int dst);
 
-/* Low level logging. To use only for very big messages, otherwise
- * serverLog() is to prefer. */
+//低级别的logging ，仅仅用来打印非常大的日志信息
 void serverLogRaw(int level, const char *msg) {
     const int syslogLevelMap[] = { LOG_DEBUG, LOG_INFO, LOG_NOTICE, LOG_WARNING };
     const char *c = ".-*#";
@@ -1026,9 +1025,7 @@ void serverLogRaw(int level, const char *msg) {
     if (server.syslog_enabled) syslog(syslogLevelMap[level], "%s", msg);
 }
 
-/* Like serverLogRaw() but with printf-alike support. This is the function that
- * is used across the code. The raw version is only used in order to dump
- * the INFO output on crash. */
+//日常用serverLog serverLogRaw()方法仅仅在崩溃的时候去dump日志使用
 void serverLog(int level, const char *fmt, ...) {
     va_list ap;
     char msg[LOG_MAX_LEN];
@@ -1042,12 +1039,6 @@ void serverLog(int level, const char *fmt, ...) {
     serverLogRaw(level,msg);
 }
 
-/* Log a fixed message without printf-alike capabilities, in a way that is
- * safe to call from a signal handler.
- *
- * We actually use this only for signals that are not fatal from the point
- * of view of Redis. Signals that are going to kill the server anyway and
- * where we need printf-alike features are served by serverLog(). */
 void serverLogFromHandler(int level, const char *msg) {
     int fd;
     int log_to_stdout = server.logfile[0] == '\0';
@@ -1070,7 +1061,7 @@ err:
     if (!log_to_stdout) close(fd);
 }
 
-/* Return the UNIX time in microseconds */
+//微妙
 long long ustime(void) {
     struct timeval tv;
     long long ust;
@@ -1081,15 +1072,13 @@ long long ustime(void) {
     return ust;
 }
 
-/* Return the UNIX time in milliseconds */
+//毫秒
 mstime_t mstime(void) {
     return ustime()/1000;
 }
 
-/* After an RDB dump or AOF rewrite we exit from children using _exit() instead of
- * exit(), because the latter may interact with the same file objects used by
- * the parent process. However if we are testing the coverage normal exit() is
- * used in order to obtain the right coverage information. */
+//exist()会清理I/O缓存，关闭文件描述符，所以如果不是测试，就调用_exit()
+//_exit()就只会退出，因为父进程可能会再次使用文件资源
 void exitFromChild(int retcode) {
 #ifdef COVERAGE_TEST
     exit(retcode);

@@ -1,10 +1,9 @@
 /*** TODO husd ***/
-/* A simple event-driven programming library. Originally I wrote this code
- * for the Jim's event-loop (Jim is a Tcl interpreter) but later translated
- * it in form of a library for easy reuse.
+/***
  *
  * 事件驱动程序 最开始是为Jim写的 后来为了重用才封装成一个库
- */
+ *
+ ***/
 
 #ifndef __AE_H__
 #define __AE_H__
@@ -14,18 +13,19 @@
 #define AE_OK 0
 #define AE_ERR -1
 
-#define AE_NONE 0       /* No events registered. */
-#define AE_READABLE 1   /* Fire when descriptor is readable. */
-#define AE_WRITABLE 2   /* Fire when descriptor is writable. */
-#define AE_BARRIER 4    /* With WRITABLE, never fire the event if the
+#define AE_NONE 0       /*  没有注册事件 */
+#define AE_READABLE 1   /* 可读的时候激活 */
+#define AE_WRITABLE 2   /* 可写的时候激活 */
+#define AE_BARRIER 4    /* 有可写，在同一个事件迭代中可读事件激活之后不会激活 在发送回复之前想向磁盘持久化数据的时候有用 */
+/* With WRITABLE, never fire the event if the
                            READABLE event already fired in the same event
                            loop iteration. Useful when you want to persist
                            things to disk before sending replies, and want
                            to do that in a group fashion. */
 
-#define AE_FILE_EVENTS 1
-#define AE_TIME_EVENTS 2
-#define AE_ALL_EVENTS (AE_FILE_EVENTS|AE_TIME_EVENTS)
+#define AE_FILE_EVENTS 1 //文件事件
+#define AE_TIME_EVENTS 2 //时间事件 redis的一些定时任务
+#define AE_ALL_EVENTS (AE_FILE_EVENTS|AE_TIME_EVENTS) //文件事件或者时间事件
 #define AE_DONT_WAIT 4
 #define AE_CALL_AFTER_SLEEP 8
 
@@ -71,13 +71,13 @@ typedef struct aeFiredEvent {
 
 /* State of an event based program */
 typedef struct aeEventLoop {
-    int maxfd;   /* highest file descriptor currently registered */
-    int setsize; /* max number of file descriptors tracked */
+    int maxfd;   /*  当前最大的FD */
+    int setsize; /* 可同时监听的FD的最大个数 */
     long long timeEventNextId;
     time_t lastTime;     /* Used to detect system clock skew */
-    aeFileEvent *events; /* Registered events */
-    aeFiredEvent *fired; /* Fired events */
-    aeTimeEvent *timeEventHead;
+    aeFileEvent *events; /* Registered events */ //注册事件
+    aeFiredEvent *fired; /* Fired events */ //激活事件？
+    aeTimeEvent *timeEventHead; //时间事件
     int stop;
     void *apidata; /* This is used for polling API specific data */
     aeBeforeSleepProc *beforesleep;

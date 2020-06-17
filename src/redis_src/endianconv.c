@@ -4,8 +4,7 @@
 
 #include <stdint.h>
 
-/* Toggle the 16 bit unsigned integer pointed by *p from little endian to
- * big endian */
+//小端转大端
 void memrev16(void *p) {
     unsigned char *x = p, t;
 
@@ -14,8 +13,7 @@ void memrev16(void *p) {
     x[1] = t;
 }
 
-/* Toggle the 32 bit unsigned integer pointed by *p from little endian to
- * big endian */
+//小端转大端
 void memrev32(void *p) {
     unsigned char *x = p, t;
 
@@ -27,8 +25,7 @@ void memrev32(void *p) {
     x[2] = t;
 }
 
-/* Toggle the 64 bit unsigned integer pointed by *p from little endian to
- * big endian */
+//小端转大端
 void memrev64(void *p) {
     unsigned char *x = p, t;
 
@@ -46,6 +43,7 @@ void memrev64(void *p) {
     x[4] = t;
 }
 
+//小端转大端
 uint16_t intrev16(uint16_t v) {
     memrev16(&v);
     return v;
