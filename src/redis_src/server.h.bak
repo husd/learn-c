@@ -545,7 +545,7 @@ typedef struct RedisModuleDigest {
 
 //这个是redis里的所有的内部结构的编码
 //可以看redisObject的结构 unsigned encoding:4; 就是这个值
-#define OBJ_ENCODING_RAW 0     /*  原生结构 */
+#define OBJ_ENCODING_RAW 0     /*  原声结构 */
 #define OBJ_ENCODING_INT 1     /* int */
 #define OBJ_ENCODING_HT 2      /*  hash table */
 #define OBJ_ENCODING_ZIPMAP 3  /*  zipmap */
