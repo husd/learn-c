@@ -1,17 +1,19 @@
 
 #include <stdio.h>
-#include <stdlib.h>
+#include "../_util_.h"
 
 int reverse_bits(int n);
 
+// gcc reverse_bits.c ../_util_.c
 int main() {
 
-    int n = 5;
-    unsigned int n1 = reverse_bits(n);
-    char *a1,*a2;
-    //itoa(reverse_bits(n),a1,2);
-    //itoa(n,a2,2);
-    printf("n is:%d reverse is :%d",n,n1);
+    int n1 = 25;
+    int n2 = reverse_bits(n1);
+    char a1[33],a2[33];
+    itoa_online(n1,a1,2);
+    itoa_online(n2,a2,2);
+    printf("n  is: %d reverse is : %d \n",n1,n2);
+    printf("a1 is: %s reverse is : %s \n",a1,a2);
     return 0;
 }
 
@@ -19,9 +21,11 @@ int main() {
 // 反转之后，应该是 10011000
 int reverse_bits(int n) {
 
-    int res = 0;
-    for (int i = 0; i < 32; i++) {
-        res ^= (n & (1 << i)) == 0 ? 0 : 1 << (31 - i);
-    }
-    return res;
+    n = (n >> 16) | (n << 16);
+    n = ((n & 0xff00ff00) >> 8) | ((n & 0x00ff00ff) << 8);
+    n = ((n & 0xf0f0f0f0) >> 4) | ((n & 0x0f0f0f0f) << 4);
+    n = ((n & 0xcccccccc) >> 2) | ((n & 0x33333333) << 2);
+    n = ((n & 0xaaaaaaaa) >> 1) | ((n & 0x55555555) << 1);
+    return n;
 }
+
