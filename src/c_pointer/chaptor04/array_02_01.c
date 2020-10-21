@@ -16,10 +16,10 @@ extern int *b;
 
 int main() {
 
-int x,y;
-x= a[0];
-y= b[1];
+    int x, y;
+    x = a[0];
+    y = b[1];
 
-printf("this x is %d y is %d \n",x,y);
-return 0;
+    printf("this x is %d y is %d \n", x, y);
+    return 0;
 }

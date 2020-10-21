@@ -7,13 +7,13 @@ void scan_arr(const char *arr);
 int main() {
 
     //简单的初始化
-    int arr[10] = {1,2,3,4,5,6,7,8,9,10};
+    int arr[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
     for (int i = 0; i < 10; i++) {
         //下标访问 和 指针访问
         printf("this is %d %d \n", arr[i], *(arr + i));
     }
 
-    char arr2[4] = {'a','b','c','d'};
+    char arr2[4] = {'a', 'b', 'c', 'd'};
     for (int i = 0; i < 4; i++) {
         //指针访问
         printf("this is %c \n", *(arr2 + i));
