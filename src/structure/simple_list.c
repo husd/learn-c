@@ -14,6 +14,38 @@ typedef struct NODE {
     int val;
 } NODE;
 
+NODE  *list_search(NODE *head,int val) {
+
+    while(head != NULL && head->val != val) {
+        head = head->next;
+    }
+    return head;
+}
+
+//这个是回调函数的版本
+NODE *list_search_callback(NODE *head,int const val,
+                           int (*compare(void const *,void const *))) {
+
+    while(head != NULL) {
+        if(compare(&(head->val),&val) == 0) {
+            break;
+        } else {
+            head = head->next;
+        }
+    }
+    return head;
+}
+
+int compare_int(void const *A,void const *B) {
+
+    //这1步，是1个强制转换
+    if( *(int *)A == *(int *)B ) {
+        return 0;
+    } else {
+        return 1;
+    }
+}
+
 int list_insert(NODE *curr,int val) {
     NODE *new_node;
     while(curr->next != NULL) {
@@ -105,6 +137,11 @@ int main() {
     head = list_remove(head,head->next);
     list_print(head);
     printf("head has been cleared \n");
+    NODE *s = list_search(head,10);
+    printf("find 10 node is :%d next is %d \n ",s->val,s->next->val);
+    const int p = 10;
+    NODE *s1 = list_search_callback(head,p,compare_int);
+    printf("find 10 call back version node is :%d next is %d \n ",s1->val,s1->next->val);
     list_clear(head);
     //此时不能再free(head)了，因为head已经被释放了
     head = NULL;
