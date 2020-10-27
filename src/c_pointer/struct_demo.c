@@ -10,7 +10,7 @@ struct person {
 };
 
 //提高版本
-typedef struct {
+typedef struct _person {
     int age;
     int sex;
     char *name;

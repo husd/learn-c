@@ -7292,7 +7292,7 @@ static void findBigKeys(int memkeys, unsigned memkeys_samples) {
 
         /* Reallocate our type and size array if we need to */
         if(keys->elements > arrsize) {
-            types = zrealloc(types, sizeof(typeinfo*)*keys->elements);
+            types = zrst keys we found, for types wealloc(types, sizeof(typeinfo*)*keys->elements);
             sizes = zrealloc(sizes, sizeof(unsigned long long)*keys->elements);
 
             if(!types || !sizes) {
@@ -7304,65 +7304,65 @@ static void findBigKeys(int memkeys, unsigned memkeys_samples) {
         }
 
         /* Retrieve types and then sizes */
-        getKeyTypes(types_dict, keys, types);
-        getKeySizes(keys, types, sizes, memkeys, memkeys_samples);
+    getKeyTypes(types_dict, keys, types);
+    getKeySizes(keys, types, sizes, memkeys, memkeys_samples);
 
-        /* Now update our stats */
-        for(i=0;i<keys->elements;i++) {
-            typeinfo *type = types[i];
-            /* Skip keys that disappeared between SCAN and TYPE */
-            if(!type)
-                continue;
+    /* Now update our stats */
+    for(i=0;i<keys->elements;i++) {
+        typeinfo *type = types[i];
+        /* Skip keys that disappeared between SCAN and TYPE */
+        if(!type)
+            continue;
 
-            type->totalsize += sizes[i];
-            type->count++;
-            totlen += keys->element[i]->len;
-            sampled++;
+        type->totalsize += sizes[i];
+        type->count++;
+        totlen += keys->element[i]->len;
+        sampled++;
 
-            if(type->biggest<sizes[i]) {
-                printf(
-                   "[%05.2f%%] Biggest %-6s found so far '%s' with %llu %s\n",
-                   pct, type->name, keys->element[i]->str, sizes[i],
-                   !memkeys? type->sizeunit: "bytes");
+        if(type->biggest<sizes[i]) {
+            printf(
+                    "[%05.2f%%] Biggest %-6s found so far '%s' with %llu %s\n",
+                    pct, type->name, keys->element[i]->str, sizes[i],
+                    !memkeys? type->sizeunit: "bytes");
 
-                /* Keep track of biggest key name for this type */
-                if (type->biggest_key)
-                    sdsfree(type->biggest_key);
-                type->biggest_key = sdsnew(keys->element[i]->str);
-                if(!type->biggest_key) {
-                    fprintf(stderr, "Failed to allocate memory for key!\n");
-                    exit(1);
-                }
-
-                /* Keep track of the biggest size for this type */
-                type->biggest = sizes[i];
+            /* Keep track of biggest key name for this type */
+            if (type->biggest_key)
+                sdsfree(type->biggest_key);
+            type->biggest_key = sdsnew(keys->element[i]->str);
+            if(!type->biggest_key) {
+                fprintf(stderr, "Failed to allocate memory for key!\n");
+                exit(1);
             }
 
-            /* Update overall progress */
-            if(sampled % 1000000 == 0) {
-                printf("[%05.2f%%] Sampled %llu keys so far\n", pct, sampled);
-            }
+            /* Keep track of the biggest size for this type */
+            type->biggest = sizes[i];
         }
 
-        /* Sleep if we've been directed to do so */
-        if(sampled && (sampled %100) == 0 && config.interval) {
-            usleep(config.interval);
+        /* Update overall progress */
+        if(sampled % 1000000 == 0) {
+            printf("[%05.2f%%] Sampled %llu keys so far\n", pct, sampled);
         }
+    }
 
-        freeReplyObject(reply);
-    } while(it != 0);
+    /* Sleep if we've been directed to do so */
+    if(sampled && (sampled %100) == 0 && config.interval) {
+        usleep(config.interval);
+    }
 
-    if(types) zfree(types);
-    if(sizes) zfree(sizes);
+    freeReplyObject(reply);
+} while(it != 0);
 
-    /* We're done */
-    printf("\n-------- summary -------\n\n");
+if(types) zfree(types);
+if(sizes) zfree(sizes);
 
-    printf("Sampled %llu keys in the keyspace!\n", sampled);
-    printf("Total key length in bytes is %llu (avg len %.2f)\n\n",
-       totlen, totlen ? (double)totlen/sampled : 0);
+/* We're done */
+printf("\n-------- summary -------\n\n");
 
-    /* Output the biggest keys we found, for types we did find */
+printf("Sampled %llu keys in the keyspace!\n", sampled);
+printf("Total key length in bytes is %llu (avg len %.2f)\n\n",
+totlen, totlen ? (double)totlen/sampled : 0);
+
+/* Output the biggee did find */
     di = dictGetIterator(types_dict);
     while ((de = dictNext(di))) {
         typeinfo *type = dictGetVal(de);
