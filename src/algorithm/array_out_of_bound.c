@@ -8,10 +8,11 @@
 * 在MAC系统上编译之后，居然没有越界，有可能是编译器字节对齐了？
 *
 **/
-int main(int argc, char* argv[]){
+int main(int argc, char *argv[])
+{
     int i = 0;
     int arr[3] = {0};
-    for(; i<=3; i++){
+    for (; i <= 3; i++) {
         arr[i] = 0;
         printf("hello world\n");
     }
