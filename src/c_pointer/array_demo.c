@@ -1,50 +1,33 @@
-//多维数据的传参数
+
 #include <stdio.h>
-#include <stdlib.h>
 
+void scan_arr(const char *arr);
 
-#define MAX 8
+// array_demo.c
+int main() {
 
-const int MAX_SIZE = 100;
-// int error_arr[MAX_SIZE]; //会编译错误
-
-//动态扩容
-static int CURRENT_ELE = 0;
-static const int INIT_SIZE = 5;
-static int TOTAL_ELE = 5;
-
-char *dynamic_arr;
-
-void arr_add_new(char c)
-{
-    if (CURRENT_ELE == 0) {
-        dynamic_arr = malloc(INIT_SIZE * sizeof(char));
+    //简单的初始化
+    int arr[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    for (int i = 0; i < 10; i++) {
+        //下标访问 和 指针访问
+        printf("this is %d %d \n", arr[i], *(arr + i));
     }
-    if (CURRENT_ELE > 0 && TOTAL_ELE > 0 && CURRENT_ELE == TOTAL_ELE - 1) {
-        //计算新数组的大小
-        TOTAL_ELE = TOTAL_ELE * 2;
-        //分配内存
-        char *tmp;
-        tmp = (char *) realloc(dynamic_arr, TOTAL_ELE);
-        if (tmp == NULL) {
-            printf("out of mem \n");
-            exit(1);
-        }
-        dynamic_arr = tmp;
-        dynamic_arr[CURRENT_ELE++] = c;
-        printf("resize success now num:%d total:%d \n", CURRENT_ELE, TOTAL_ELE);
-    } else {
-        dynamic_arr[CURRENT_ELE++] = c;
-        //printf("add success now num:%d total:%d \n", CURRENT_ELE, TOTAL_ELE);
+
+    char arr2[4] = {'a', 'b', 'c', 'd'};
+    for (int i = 0; i < 4; i++) {
+        //指针访问
+        printf("this is %c \n", *(arr2 + i));
     }
+
+    scan_arr(arr2);
+    return 0;
 }
 
+void scan_arr(const char *arr) {
 
-int main()
-{
 
-    for (int i = 0; i < 100; i++) {
-        arr_add_new((char) i);
+    for (int i = 0; i < 4; i++) {
+        //指针访问
+        printf("func seen this is %c \n", *(arr + i));
     }
-    return 0;
 }
