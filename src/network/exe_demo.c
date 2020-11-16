@@ -17,18 +17,19 @@
  * @param argv
  * @return
  */
-int main(int argc,char *argv[]) {
+int main(int argc, char *argv[])
+{
 
     char *p1 = argv[1];
     char *p2 = "/Users/hushengdong/hushengdong/github-source/learn-c/src/network/time_demo";
-
-    if(access(p1) == -1) {
-        printf("no permissions to execute %s",p1);
+    int res;
+    if ((res = access(p1, 2)) == -1) {
+        printf("no permissions to execute %s", p1);
         return -1;
     }
-
-    printf(" p1 is :%s \n",p1);
-    printf(" p2 is :%s\n",p2);
-    execve(p1,NULL,NULL);
+    printf("access of %s is %d",p1,res);
+    printf(" p1 is :%s \n", p1);
+    printf(" p2 is :%s\n", p2);
+    execve(p1, NULL, NULL);
     return 0;
 }
