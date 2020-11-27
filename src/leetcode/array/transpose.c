@@ -33,7 +33,7 @@
  * The sizes of the arrays are returned as *returnColumnSizes array.
  * Note: Both returned array and *columnSizes array must be malloced, assume caller calls free().
  */
-
+#include <stdlib.h>
 //这种变量的2维数组，要多联系
 
 // *returnSize 和 **returnColumnSizes 是为了调用方，能够拿到这2个值，所以传得指针。服了，这么搞
