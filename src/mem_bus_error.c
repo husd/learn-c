@@ -12,6 +12,7 @@ int main() {
     //演示bus error
     int *p = (int *) & (u.a[1]);
     *p = 17; // p中未对齐的地址会引起一个bus error
+    
     /* the misaligned addr in p causes a bus error! */
 
     /*
@@ -21,7 +22,6 @@ int main() {
      * into an address that is aligned only for single-byte access.
      *
      * */
-
     //mac下没有显示出应有的效果来
     return 0;
 }

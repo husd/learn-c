@@ -8,7 +8,35 @@
 #include <stdio.h>
 #include <string.h>
 
-int bf(char *long_str, char *short_str)
+//经典写法，也比较简单
+int bf(char *s, char *p)
+{
+
+     int sLen = strlen(s);  
+    int pLen = strlen(p);  
+    int i = 0, j = 0;
+    while (i < sLen && j < pLen) {
+        //相等就继续向下走
+        if (s[i] == p[j]) {
+            i++;
+            j++;
+        } else {
+            // i = i - (j - 1) 让i回到开头的位置 ，注意j = 0的顺序
+            i = i - j + 1;
+            j = 0;
+        }
+    }
+    if (j == pLen) {
+        return i - j;
+    }
+    return -1;
+}
+
+
+//这种嵌套循环的写法，不是经典写法，经典写法是
+//j=0;
+// i= i- j + 1;
+int bf2(char *long_str, char *short_str)
 {
 
     int max_len = strlen(long_str);

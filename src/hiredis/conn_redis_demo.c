@@ -79,6 +79,8 @@ int main()
         }
     }
     freeReplyObject(reply);
+    
+    //freeReplyObject(reply);
 
     char *map_key = "husd:map";
     char *map_field = "name";
