@@ -8,7 +8,7 @@
 
 //
 
-#include<stdio.h>
+#include <stdio.h>
 
 // callback func define
 int Handle(int (*Callback)());

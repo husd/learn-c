@@ -7,7 +7,8 @@
 #include <stdio.h>
 #include <unistd.h>
 
-int main() {
+int main()
+{
 
     uintptr_t a;
     printf("uintptr_t size if is: %ld \n", sizeof(a));
@@ -15,4 +16,3 @@ int main() {
     printf("size_t size if is: %ld \n", sizeof(t));
     return 0;
 }
-
