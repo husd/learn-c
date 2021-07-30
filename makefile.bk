@@ -1,6 +1,0 @@
-target=test.o
-sds:${target}
-	gcc -o test.out ${target}
-test.o: test.c
-clean:
-	rm test.out *.o
